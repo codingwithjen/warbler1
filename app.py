@@ -143,7 +143,6 @@ def users_show(user_id):
     """Show user profile."""
 
     user = User.query.get_or_404(user_id)
-
     # snagging messages in order from the database;
     # user.messages won't be in order by default
     messages = (Message
@@ -152,7 +151,8 @@ def users_show(user_id):
                 .order_by(Message.timestamp.desc())
                 .limit(100)
                 .all())
-    return render_template('users/show.html', user=user, messages=messages)
+    likes = [message.id for message in user.likes]
+    return render_template('users/show.html', user=user, messages=messages, likes=likes)
 
 
 @app.route('/users/<int:user_id>/following')
@@ -210,7 +210,17 @@ def stop_following(follow_id):
 
 # Part Two: Add Likes
 
+@app.route('/users/<int:user_id>/likes', methods=['GET'])
+def show_likes(user_id):
+    if not g.user:
+        flash("Access unauthorized", "danger")
+        return redirect("/")
+
+    user = User.query.get_or_404(user_id)
+    return render_template('users/likes.html', user=user, likes=user.likes)
+
 # Part Two Add Likes - Allows user to "like" a Warble
+
 @app.route('/messages/<int:message_id>/like', methods=['POST'])
 def add_like(message_id):
     """Toggle a liked message for the currently-logged-in user."""
@@ -231,6 +241,8 @@ def add_like(message_id):
         g.user.likes.append(liked_message)
 
     db.session.commit()
+
+    return redirect("/")
 
 
 
@@ -306,7 +318,7 @@ def messages_add():
 def messages_show(message_id):
     """Show a message."""
 
-    msg = Message.query.get(message_id)
+    msg = Message.query.get_or_404(message_id)
     return render_template('messages/show.html', message=msg)
 
 
@@ -318,7 +330,11 @@ def messages_destroy(message_id):
         flash("Access unauthorized.", "danger")
         return redirect("/")
 
-    msg = Message.query.get(message_id)
+    msg = Message.query.get_or_404(message_id)
+    if msg.user_id != g.user.id:
+        flash("Access unauthorized.", "danger")
+        return redirect("/")
+
     db.session.delete(msg)
     db.session.commit()
 
